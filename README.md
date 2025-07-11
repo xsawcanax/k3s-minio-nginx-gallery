@@ -1,141 +1,171 @@
 # Mini-klaster K3s z MinIO i frontendem Nginx
 
-## Skład środowiska
+## Cel projektu
 
-- **k3d/k3s** – lokalny klaster Kubernetes
-- **Rancher Desktop** – zarządzanie klastrem
-- **MinIO** – obiektowy storage (jak S3), hostujący obrazki
-- **Nginx (Bitnami)** – serwer frontendowy
-- **Helm** – do instalacji aplikacji
-- **mc (MinIO Client)** – zarządzanie bucketami i politykami
+Celem projektu jest uruchomienie lokalnego, wielowęzłowego klastra Kubernetes (k3s) i wdrożenie w nim:
+
+* **Ingress Controller (nginx-ingress)** – do zarządzania ruchem HTTP i kierowania do aplikacji
+* **MinIO** – obiektowy storage kompatybilny z S3, przechowujący obrazki
+* **nginx-frontend** – serwis statyczny wyświetlający galerię obrazków z MinIO
+
+Projekt pokazuje umiejętności konfiguracji klastra, wdrożenia aplikacji za pomocą Helm oraz konfiguracji Ingress i port-forwardingu.
 
 ---
 
-## Uruchomienie klastra
+## Skład środowiska
+
+* k3d/k3s – lokalny klaster Kubernetes
+* Rancher Desktop – zarządzanie klastrem
+* MinIO – obiektowy storage
+* Nginx (Bitnami) – serwer frontendowy
+* Helm – do instalacji aplikacji
+* mc (MinIO Client) – zarządzanie bucketami i politykami
+* nginx-ingress Controller – zarządzanie ruchem HTTP
+
+---
+
+## 1. Utworzenie klastra k3s
+
+Stwórz lokalny klaster z 1 serwerem i 2 agentami:
 
 ```bash
-k3d cluster create moj-klaster --agents 2
+k3d cluster create moj-klaster --agents 2 --api-port 6550
+kubectl get nodes
 ```
 
 ---
 
-## Instalacja MinIO
+## 2. Instalacja nginx-ingress Controller
+
+Dodaj repozytorium i zainstaluj kontroler:
+
+```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+helm install ingress-nginx ingress-nginx/ingress-nginx --create-namespace --namespace ingress-nginx
+```
+
+---
+
+## 3. Instalacja MinIO
+
+Dodaj repozytorium Bitnami i zainstaluj MinIO z własnym plikiem wartości:
 
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo update
-
 helm install minio bitnami/minio -f minio/values-minio.yaml
 ```
 
-Po instalacji sprawdź:
+Po instalacji sprawdź serwisy i zmień typ na NodePort, jeśli to konieczne:
 
 ```bash
 kubectl get svc -l app.kubernetes.io/name=minio
-```
-
-Zmieniamy typ serwisu `minio` na `NodePort` (jeśli nie jest ustawiony):
-
-```bash
 kubectl patch svc minio --type merge -p '{"spec": {"type": "NodePort"}}'
 ```
 
 ---
 
-## Dostęp do MinIO
+## 4. Port-forwarding MinIO
 
-- GUI: http://localhost:9090  
-- API / zdjęcia: http://localhost:31200
-
-Dane logowania (domyślne):
-
-- **Login:** `minioadmin`
-- **Hasło:** `minioadmin`
-
----
-
-## Dodawanie obrazków do MinIO
-
-1. Wejdź w GUI: http://localhost:9090
-2. Zaloguj się.
-3. Utwórz bucket o nazwie: `demo`
-4. Wgraj tam obrazki (`image1.jpg`, `image2.jpg`, `image3.jpg`)
-
-Uwaga: pliki powinny być dostępne pod adresem:  
-`http://localhost:31200/demo/image1.jpg` itd.
-
----
-
-## Ustawienie polityki publicznej
+Uzyskaj dostęp do MinIO GUI i API lokalnie:
 
 ```bash
-./mc alias set local http://localhost:31200 minioadmin minioadmin
-./mc anonymous set download local/demo
+kubectl port-forward svc/minio 9000:9000
+kubectl port-forward svc/minio-console 9090:9090
+```
+
+Dostęp:
+
+* GUI MinIO: `http://localhost:9090`
+* API MinIO: `http://localhost:9000`
+
+---
+
+## 5. Konfiguracja MinIO Client (mc)
+
+Dodaj alias do klienta i ustaw publiczny dostęp do bucketa `demo`:
+
+```bash
+mc alias set local http://localhost:9000 minioadmin minioadmin
+mc anonymous set download local/demo
 ```
 
 ---
 
-## Instalacja frontendu (NGINX)
+## 6. Dodanie obrazków do MinIO
+
+Zaloguj się do GUI MinIO i wgraj obrazki do bucketa `demo`.
+
+---
+
+## 7. Utworzenie ConfigMap dla frontendu
+
+Utwórz ConfigMap `nginx-index` z plikiem `index.html` lokalnie lub z repozytorium:
+
+```bash
+kubectl create configmap nginx-index --from-file=frontend/index.html
+```
+
+---
+
+## 8. Instalacja frontendu nginx-frontend
+
+Użyj pliku `values-frontend.yaml` (w repozytorium) do konfiguracji wolumenów, punktów montowania, portów i zmiennych środowiskowych.
+
+Zainstaluj lub zaktualizuj frontend:
 
 ```bash
 helm install nginx-frontend bitnami/nginx -f frontend/values-frontend.yaml
-```
-
-Frontend używa `ConfigMap` o nazwie `nginx-index`, zawierającej statyczny `index.html`.
-
----
-
-## Zawartość index.html (ConfigMap)
-
-```html
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-<meta charset="UTF-8">
-<title>Galeria</title>
-<style>
-body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-h1 { margin-bottom: 20px; }
-.gallery { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; }
-.gallery img { max-width: 300px; border: 2px solid #ddd; border-radius: 8px; }
-</style>
-</head>
-<body>
-<h1>Galeria z MinIO</h1>
-<div class="gallery">
-  <img src="http://localhost:31200/demo/image1.jpg" alt="Image 1">
-  <img src="http://localhost:31200/demo/image2.jpg" alt="Image 2">
-  <img src="http://localhost:31200/demo/image3.jpg" alt="Image 3">
-</div>
-</body>
-</html>
+# lub
+helm upgrade nginx-frontend bitnami/nginx -f frontend/values-frontend.yaml
 ```
 
 ---
 
-## Struktura katalogów projektu
+## 9. Konfiguracja Ingress
 
-```
-projekt/
-├── frontend/
-│   ├── values-frontend.yaml
-│   └── nginx-deployment.yaml (opcjonalnie)
-├── minio/
-│   └── values-minio.yaml
-├── ingress/
-│   └── ingress.yaml (opcjonalnie)
-├── mc.exe (MinIO client)
-└── README.md
+Stwórz i zastosuj plik `ingress.yaml` dla przekierowania ruchu HTTP do serwisu frontendowego:
+
+```bash
+kubectl apply -f ingress/ingress.yaml
 ```
 
 ---
 
-## Sprawdzenie działania
+## 10. Sprawdzenie działania
 
-Otwórz przeglądarkę i przejdź do:
+Otwórz przeglądarkę pod adresem:
 
 ```
 http://localhost:8080
 ```
 
-Jeśli wszystko działa poprawnie, zobaczysz galerię z obrazkami z MinIO
+Powinna się wyświetlić galeria obrazków z MinIO.
+
+---
+## Autoskalowanie nginx-frontend
+
+1. Sprawdź działanie Metrics Server:
+
+```bash
+kubectl top nodes
+kubectl top pods
+```
+
+2. Zastosuj manifest HPA (plik `nginx-frontend-hpa.yaml`):
+
+```bash
+kubectl apply -f nginx-frontend-hpa.yaml
+```
+
+3. Monitoruj autoskalera:
+
+```bash
+kubectl get hpa nginx-frontend-hpa
+kubectl describe hpa nginx-frontend-hpa
+```
+
+---
+
+
