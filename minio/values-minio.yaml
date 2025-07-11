@@ -1,0 +1,22 @@
+auth:
+  rootUser: minioadmin
+  rootPassword: minioadmin
+defaultBuckets: "demo"
+
+mode: standalone
+
+containerPorts:
+  api: 9000
+
+service:
+  type: ClusterIP
+
+podAnnotations: {}
+
+podLabels: {}
+
+extraContainerPorts:
+  - name: host-api
+    containerPort: 9000
+    hostPort: 30777
+    protocol: TCP

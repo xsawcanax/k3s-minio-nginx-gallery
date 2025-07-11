@@ -1,0 +1,16 @@
+serverBlockConfig: |
+  location / {
+    root /app/html;
+    index index.html;
+  }
+
+documentRoot: /app/html
+
+extraVolumes:
+  - name: html
+    configMap:
+      name: nginx-index
+
+extraVolumeMounts:
+  - name: html
+    mountPath: /app/html
