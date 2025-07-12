@@ -106,10 +106,26 @@ Utwórz ConfigMap `nginx-index` z plikiem `index.html` lokalnie lub z repozytori
 ```bash
 kubectl create configmap nginx-index --from-file=frontend/index.html
 ```
+---
+
+## 8. Konfiguracja niestandardowego bloku serwera Nginx
+Aby nginx prawidłowo serwował statyczne pliki z odpowiedniego katalogu i na właściwym porcie (8080), konieczne jest utworzenie ConfigMap z niestandardową konfiguracją serwera.
+
+Plik `nginx-server-block.yaml` definiuje konfigurację serwera Nginx, np.:
+
+* ustawienie portu nasłuchiwania na 8080,
+* katalog root `/app/html`,
+* obsługę pliku `index.html`.
+
+Ta ConfigMap jest montowana do kontenera nginx jako plik konfiguracyjny (`/opt/bitnami/nginx/conf/server_blocks/default.conf`) za pomocą `extraVolumes` i `extraVolumeMounts` zdefiniowanych w `values-frontend.yaml`.
+
+Dzięki temu nginx korzysta z właściwej konfiguracji i poprawnie wyświetla frontendową galerię.
+
+Bez tego pliku nginx użyje domyślnej konfiguracji, która powoduje wyświetlanie standardowej strony powitalnej „Welcome to nginx!”.
 
 ---
 
-## 8. Instalacja frontendu nginx-frontend
+## 9. Instalacja frontendu nginx-frontend
 
 Użyj pliku `values-frontend.yaml` (w repozytorium) do konfiguracji wolumenów, punktów montowania, portów i zmiennych środowiskowych.
 
@@ -123,7 +139,7 @@ helm upgrade nginx-frontend bitnami/nginx -f frontend/values-frontend.yaml
 
 ---
 
-## 9. Konfiguracja Ingress
+## 10. Konfiguracja Ingress
 
 Stwórz i zastosuj plik `ingress.yaml` dla przekierowania ruchu HTTP do serwisu frontendowego:
 
@@ -133,7 +149,7 @@ kubectl apply -f ingress/ingress.yaml
 
 ---
 
-## 10. Sprawdzenie działania
+## 11. Sprawdzenie działania
 
 Otwórz przeglądarkę pod adresem:
 
