@@ -167,5 +167,28 @@ kubectl describe hpa nginx-frontend-hpa
 ```
 
 ---
+## Testowanie działania autoskalera
+
+Aby przetestować, czy autoskaler działa poprawnie, możesz użyć narzędzia `hey` do generowania ruchu HTTP obciążającego serwis.
+
+### Instalacja hey
+
+Pobierz binarkę `hey` odpowiednią dla swojego systemu ze [strony projektu](https://github.com/rakyll/hey/releases).
+
+### Uruchomienie testu obciążeniowego
+
+Uruchom poniższe polecenie, które przez 2 minuty będzie generować 50 zapytań na sekundę, z 50 równoczesnymi klientami:
+
+```bash
+./hey.exe -z 2m -q 50 -c 50 http://localhost:8080/
+```
+
+### Co to robi?
+
+* `-z 2m` — test trwa 2 minuty
+* `-q 50` — 50 zapytań na sekundę
+* `-c 50` — 50 równoczesnych klientów
+
+Obciążenie to powinno zwiększyć wykorzystanie CPU podów, co spowoduje skalowanie się deploymentu dzięki HPA.
 
 
