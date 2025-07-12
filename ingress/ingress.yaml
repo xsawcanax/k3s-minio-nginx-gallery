@@ -15,4 +15,4 @@ spec:
               service:
                 name: nginx-frontend
                 port:
-                  number: 80
+                  number: 8080

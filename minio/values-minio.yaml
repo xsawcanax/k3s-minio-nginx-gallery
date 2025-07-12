@@ -9,7 +9,7 @@ containerPorts:
   api: 9000
 
 service:
-  type: ClusterIP
+  type: NodePort
 
 podAnnotations: {}
 
